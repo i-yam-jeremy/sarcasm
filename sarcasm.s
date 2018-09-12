@@ -7,23 +7,26 @@ section .data
 section .text
 default rel
 _main:
-	mov rax, 25
+	mov rax, 0
 parserloop:
 	call readchar
 	cmp cl, 0x30 ; '0'
 	jb notnumber
 	cmp cl, 0x39 ; '9'
 	ja notnumber
-	mov rcx, 0x21
-	call putchar
-	jmp error
-	
-notnumber:
-	call putchar
+
+	imul rax, 10
+	add rcx, -0x30
+	add rax, rcx
+
 	jmp parserloop
 
+notnumber:
+	mov rcx, 0x21
+	call putchar
+	mov rdi, rax
 	mov rax, 0x2000001 ; exit
-	mov rdi, 0
+	;mov rdi, 0 
 	syscall
 
 pushstack: ; takes argument in rcx
