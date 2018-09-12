@@ -1,20 +1,24 @@
 global _main
 
 section .data
-	virtual_stack dd 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	stack dq 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	stack_pos dq 0
 
 section .text
 default rel
 _main:
-	mov dword [virtual_stack], 0x22
-	mov rcx, [virtual_stack]
-	push byte rcx
+	push 0x21
+	call pushstack
+	push 0x22
+	call pushstack
+	mov rcx, [stack]
+	push rcx
+	call putchar
+	mov rcx, [stack+8]
+	push rcx
 	call putchar
 
-	add rbx, 1
-	add rax, -1
-
-	push byte 0xA
+	push 0xA
 	call putchar
 
 	
@@ -23,12 +27,22 @@ _main:
 	syscall
 
 ; TODO global variable that is large array that can be used for the stack and a separate stack "pointer" that is the index in the array (or allocate space on stack for this virtual stack by adding to the stack pointer)
-	
+
+pushstack:
+	pop rdx
+	pop rcx
+	push rdx
+	mov rax, [stack_pos]
+	mov rbx, stack
+	mov [rbx + 8*rax], rcx
+	add rax, 1
+	mov [stack_pos], rax
+	ret	
 
 putchar: ; clears rdx and rcx
-	pop word rdx ; pop return address
-	pop byte rcx ; pop argument
-	push word rdx ; push return address
+	pop rdx ; pop return address
+	pop rcx ; pop argument
+	push rdx ; push return address
 	push rax
 	push rdi
 	push rdx
