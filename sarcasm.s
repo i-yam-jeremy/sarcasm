@@ -7,18 +7,19 @@ section .data
 section .text
 default rel
 _main:
-	push 0x21
+	mov rcx, 0x21
 	call pushstack
-	push 0x22
+	mov rcx, 0x22
 	call pushstack
-	mov rcx, [stack]
-	push rcx
+
+	xor rcx, rcx ; clear rcx
+	
+	call popstack
 	call putchar
-	mov rcx, [stack+8]
-	push rcx
+	call popstack
 	call putchar
 
-	push 0xA
+	mov rcx, 0xA
 	call putchar
 
 	
@@ -26,36 +27,28 @@ _main:
 	mov rdi, 0
 	syscall
 
-; TODO global variable that is large array that can be used for the stack and a separate stack "pointer" that is the index in the array (or allocate space on stack for this virtual stack by adding to the stack pointer)
-
-pushstack:
-	pop rdx
-	pop rcx
-	push rdx
+pushstack: ; takes argument in rcx
 	mov rax, [stack_pos]
 	mov rbx, stack
 	mov [rbx + 8*rax], rcx
 	add rax, 1
 	mov [stack_pos], rax
-	ret	
+	ret
 
-putchar: ; clears rdx and rcx
-	pop rdx ; pop return address
-	pop rcx ; pop argument
-	push rdx ; push return address
-	push rax
-	push rdi
-	push rdx
-	push rsi
+popstack: ; returns result in rcx
+	mov rax, [stack_pos]
+	add rax, -1
+	mov rbx, stack
+	mov rcx, [rbx + 8*rax]
+	mov [stack_pos], rax
+	ret
+
+putchar: ; takes argument in rcx
 	mov rax, 0x2000004 ; write
 	mov rdi, 1 ; stdout
-	push byte rcx
+	push rcx
 	mov rsi, rsp
 	mov rdx, 1
 	syscall
-	pop byte rcx
-	pop rsi
-	pop rdx
-	pop rdi
-	pop rax
+	pop rcx
 	ret
