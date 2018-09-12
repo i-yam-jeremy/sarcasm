@@ -8,10 +8,19 @@ section .text
 default rel
 _main:
 	mov rax, 25
-label:
+parserloop:
 	call readchar
+	cmp cl, 0x30 ; '0'
+	jb notnumber
+	cmp cl, 0x39 ; '9'
+	ja notnumber
+	mov rcx, 0x21
 	call putchar
-	jmp label
+	jmp error
+	
+notnumber:
+	call putchar
+	jmp parserloop
 
 	mov rax, 0x2000001 ; exit
 	mov rdi, 0
