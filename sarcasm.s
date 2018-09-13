@@ -4,12 +4,16 @@ section .data
 	stack dq 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 	stack_pos dq 0
 
+	unread_char dq -1
+
 section .text
 default rel
 _main:
 	mov rax, 0
 parserloop:
 	call readchar
+	call putchar
+	
 	cmp cl, 0x30 ; '0'
 	jb notnumber
 	cmp cl, 0x39 ; '9'
@@ -54,11 +58,16 @@ popstack: ; returns result in rcx
 	pop rbx
 	pop rax
 	ret
+unread: ; unreads a single character given in rcx (cannot be called multiple times without reading)
+	mov [unread_char], rcx
 
 readchar: ; returns result in rcx
 	push rax
 	push rdx
 
+	cmp qword [unread_char], -1
+	jne _readchar_unread_char
+	; perform normal read because no unread char
 	mov rax, 0x2000003 ; read
 	mov rdi, 0
 	push rcx ; value is ignored, just location on stack is necessary
@@ -69,6 +78,14 @@ readchar: ; returns result in rcx
 	je error
 
 	pop rcx
+
+	pop rdx
+	pop rax
+	ret
+
+_readchar_unread_char:
+	mov rcx, [unread_char]
+	mov qword [unread_char], -1
 
 	pop rdx
 	pop rax
