@@ -33,13 +33,26 @@ notnumber:
 	je whitespace
 	cmp cl, 0x0D ; '\r'
 	je whitespace
+
+	cmp cl, '+'
+	je op_add
 	
 	mov rcx, 0x21
 	call putchar
-	mov rdi, [stack_pos]
+	call popstack
+	mov rdi, rcx
 	mov rax, 0x2000001 ; exit
 	;mov rdi, 0 
 	syscall
+
+op_add:
+	call popstack
+	mov rax, rcx
+	call popstack
+	add rcx, rax
+	call pushstack
+
+	jmp parserloop
 
 whitespace:
 	jmp parserloop ; ignore and keep looping
