@@ -9,29 +9,61 @@ section .data
 section .text
 default rel
 _main:
-	mov rax, 0
 parserloop:
 	call readchar
-	call putchar
 	
-	cmp cl, 0x30 ; '0'
+	cmp cl, '0'
 	jb notnumber
-	cmp cl, 0x39 ; '9'
+	cmp cl, '9'
 	ja notnumber
 
-	imul rax, 10
-	add rcx, -0x30
-	add rax, rcx
+	call unread
+	call read_number
+	mov rcx, rax
+	call pushstack
 
 	jmp parserloop
 
 notnumber:
+	cmp cl, ' '
+	je whitespace
+	cmp cl, 0x09 ; '\t'
+	je whitespace
+	cmp cl, 0x0A ; '\n'
+	je whitespace
+	cmp cl, 0x0D ; '\r'
+	je whitespace
+	
 	mov rcx, 0x21
 	call putchar
-	mov rdi, rax
+	mov rdi, [stack_pos]
 	mov rax, 0x2000001 ; exit
 	;mov rdi, 0 
 	syscall
+
+whitespace:
+	jmp parserloop ; ignore and keep looping
+
+read_number: ; parse a number literal from stdin and returns result in rax
+	mov rax, 0
+
+_read_number_loop:
+	call readchar 
+	cmp cl, '0'
+	jb _read_number_end
+	cmp cl, '9'
+	ja _read_number_end
+
+	imul rax, 10
+	
+	add rcx, -0x30 ; subtract '0' to convert ASCII character value to integer value
+	add rax, rcx
+
+	jmp _read_number_loop
+
+_read_number_end:
+	call unread
+	ret
 
 pushstack: ; takes argument in rcx
 	push rax
@@ -60,6 +92,7 @@ popstack: ; returns result in rcx
 	ret
 unread: ; unreads a single character given in rcx (cannot be called multiple times without reading)
 	mov [unread_char], rcx
+	ret
 
 readchar: ; returns result in rcx
 	push rax
