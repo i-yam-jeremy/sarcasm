@@ -87,6 +87,3 @@ To jump to a label based on the comparison of two stack values, use the operator
 :main
   10 #fact .
 ```
-
-## The Name "SarcASM"
-The name "sarcasm" comes from the fact that I am writing the interpreter in pure assembly. There is no reason other than for fun for me to write it in assembly. Any decent C compiler will produce faster code. The "ASM" in SarcASM comes from the abbreviation for assembly.
