@@ -1,5 +1,6 @@
 global _main
 
+<<<<<<< HEAD
 %define STACK_SIZE 10000
 %define CALL_STACK_SIZE 10000
 ; SOURCE_BUFFER_SIZE - max file size
@@ -27,6 +28,14 @@ section .data
 	source_overflow_message: db "Source overflow: stdin too long", 0xA
 	.len: equ $ - source_overflow_message
 	
+=======
+section .data
+	stack dq 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+	stack_pos dq 0
+
+	unread_char dq -1
+
+>>>>>>> parent of f733966... Stack overflow and underflow error messages
 section .text
 default rel
 _main:
@@ -107,6 +116,7 @@ notnumber:
 
 	cmp cl, '+'
 	je op_add
+<<<<<<< HEAD
 	cmp cl, '-'
 	je op_sub
 	cmp cl, '*'
@@ -132,6 +142,8 @@ notnumber:
 	cmp cl, ':'
 	je op_label
 
+=======
+>>>>>>> parent of f733966... Stack overflow and underflow error messages
 	
 	call popstack
 	mov rdi, rcx
@@ -148,6 +160,7 @@ op_add:
 
 	jmp execloop
 
+<<<<<<< HEAD
 op_sub:
 	call popstack
 	mov rax, rcx
@@ -306,6 +319,8 @@ op_label:
 	
 	jmp op_label ; loop while character is letter (skips the label name)
 
+=======
+>>>>>>> parent of f733966... Stack overflow and underflow error messages
 whitespace:
 	jmp execloop ; ignore and keep looping
 
@@ -336,8 +351,11 @@ pushstack: ; takes argument in rcx
 	push rax
 	push rbx
 	mov rax, [stack_pos]
+<<<<<<< HEAD
 	cmp ax, STACK_SIZE
 	jge stackoverflow
+=======
+>>>>>>> parent of f733966... Stack overflow and underflow error messages
 	mov rbx, stack
 	mov [rbx + 8*rax], rcx
 	add rax, 1
@@ -346,24 +364,12 @@ pushstack: ; takes argument in rcx
 	pop rax
 	ret
 
-stackoverflow:
-	mov rax, 0x2000004 ; write
-	mov rdi, 1 ; stdout
-	mov rsi, stack_overflow_message
-	add rsi, -16 ;; fixes offset
-	mov rdx, stack_overflow_message.len
-	syscall
-
-	jmp error
-
 popstack: ; returns result in rcx
 	push rax
 	push rbx
 
 	mov rax, [stack_pos]
 	add rax, -1
-	cmp rax, 0
-	jl stackunderflow
 	mov rbx, stack
 	mov rcx, [rbx + 8*rax]
 	mov [stack_pos], rax
@@ -371,6 +377,7 @@ popstack: ; returns result in rcx
 	pop rbx
 	pop rax
 	ret
+<<<<<<< HEAD
 
 stackunderflow:
 	mov rax, 0x2000004 ; write
@@ -395,6 +402,10 @@ pushcallstack: ; takes argument in rcx
 	mov [call_stack_pos], rax
 	pop rbx
 	pop rax
+=======
+unread: ; unreads a single character given in rcx (cannot be called multiple times without reading)
+	mov [unread_char], rcx
+>>>>>>> parent of f733966... Stack overflow and underflow error messages
 	ret
 
 popcallstack: ; returns result in rcx
