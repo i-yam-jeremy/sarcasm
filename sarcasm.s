@@ -28,6 +28,9 @@ section .data
 	;; Message for when stack underflow occurs
 	stack_underflow_message: db "Stack underflow", 0xA, 0
 	
+	;; Message for when an unknown character occurs
+	unknown_character_message: db "Unknown character: %c", 0xA, 0
+
 section .text
 default rel
 
@@ -45,7 +48,6 @@ parserloop:
 	call unread
 	call read_number
 	mov rcx, rax
-testlabel:
 	call pushstack
 
 	jmp parserloop
@@ -71,20 +73,23 @@ notnumber:
 	je op_div
 	cmp cl, '%'
 	je op_mod
-	cmp cl, '^'
-	je op_pow
 	cmp cl, '@'
 	je op_dup
 
-	
-	mov rcx, 0x21
-	call putchar
-	call popstack
-	mov rdi, rcx
-	mov rax, 0x2000001 ; exit
-	;mov rdi, 0 
-	syscall
 
+	jmp unknown_character	
+
+;; unknown character has occurred
+unknown_character:
+	mov rsi, rcx ;; the character that occurred
+	mov rdi, unknown_character_message
+	add rdi, -54 ;; fixes offset
+	add rsp, -8 ;; align stack
+	call _printf
+	push qword 1
+	call exit
+
+;; add the top two elements on the stack
 op_add:
 	call popstack
 	mov rax, rcx
@@ -94,6 +99,8 @@ op_add:
 
 	jmp parserloop
 
+;; subtract the top two elements on the stack
+;; 10 2 - is equivalent to 10 - 2
 op_sub:
 	call popstack
 	mov rax, rcx
@@ -103,6 +110,7 @@ op_sub:
 
 	jmp parserloop
 
+;; multiply the top two elements on the stack
 op_mul:
 	call popstack
 	mov rax, rcx
@@ -113,7 +121,9 @@ op_mul:
 
 	jmp parserloop
 
-op_div: ;; TODO FIXME div
+;; divide the top two elements on the stack
+;; 10 2 / is equivalent to 10 / 2
+op_div:
 	call popstack
 	mov rbx, rcx
 	call popstack
@@ -125,7 +135,9 @@ op_div: ;; TODO FIXME div
 
 	jmp parserloop
 
-op_mod: ;; TODO FIXME div
+;; mod the top two elements on the stack
+;; 10 2 % is equivalent to 10 % 2
+op_mod:
 	call popstack
 	mov rbx, rcx
 	call popstack
@@ -137,15 +149,7 @@ op_mod: ;; TODO FIXME div
 
 	jmp parserloop
 
-op_pow: ; TODO
-	call popstack
-	mov rax, rcx
-	call popstack
-	add rcx, rax
-	call pushstack
-
-	jmp parserloop
-
+;; duplicate the top element on the stack
 op_dup:
 	call popstack
 	call pushstack
@@ -153,12 +157,15 @@ op_dup:
 
 	jmp parserloop
 
+;; handle whitespace
 whitespace:
 	jmp parserloop ; ignore and keep looping
 
-read_number: ; parse a number literal from stdin and returns result in rax
+;; reads a number literal from stdin and returns the result in rax
+read_number:
 	mov rax, 0
 
+;; loops over each character in stdin until a non-digit occurs
 _read_number_loop:
 	call readchar 	
 	cmp cl, '0'
@@ -174,11 +181,13 @@ _read_number_loop:
 
 	jmp _read_number_loop
 
+;; encountered a non-digit
 _read_number_end:
 	call unread
 	ret
 
-pushstack: ; takes argument in rcx
+;; pushes the value of rcx to the virtual stack
+pushstack:
 	push rax
 	push rbx
 	mov rax, [stack_pos]
@@ -192,6 +201,7 @@ pushstack: ; takes argument in rcx
 	pop rax
 	ret
 
+;; when the stack has exceeded the maximum size
 stackoverflow:
 	mov rdi, stack_overflow_message
 	add rdi, -21 ;; fixes offset
@@ -199,7 +209,8 @@ stackoverflow:
 
 	jmp error
 
-popstack: ; returns result in rcx
+;; pops a value from the virtual stack and returns the result in rcx
+popstack:
 	push rax
 	push rbx
 
@@ -215,17 +226,20 @@ popstack: ; returns result in rcx
 	pop rax
 	ret
 
+;; when the stack is popped with zero elements in the stack
 stackunderflow:
 	mov rdi, stack_underflow_message
 	add rdi, -37 ;; fixes offset
 	call _printf
 	jmp error
 
-unread: ; unreads a single character given in rcx (cannot be called multiple times without reading)
+;; unreads a single character given in rcx (cannot be called multiple times without reading)
+unread:
 	mov [unread_char], rcx
 	ret
 
-readchar: ; returns result in rcx
+;; reads a character from stdin (or the unread character) and returns the result in rcx
+readchar:
 	push rax
 	push rdx
 
@@ -247,6 +261,7 @@ readchar: ; returns result in rcx
 	pop rax
 	ret
 
+;; there was an unread character, so return that instead of reading from stdin
 _readchar_unread_char:
 	mov rcx, [unread_char]
 	mov qword [unread_char], -1
@@ -269,6 +284,7 @@ putchar: ; takes argument in rcx
 	pop rax
 	ret
 
+;; reached the end of stdin
 end_of_file:
 	call popstack
 	mov rsi, rcx
@@ -282,6 +298,7 @@ end_of_file:
 	push qword 0
 	call exit
 
+;; exits the program with the status given by the top qword on the stack (real stack not virtual stack)
 exit:
 	pop rdi
 	mov rax, SYSCALL_EXIT
