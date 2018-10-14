@@ -1,24 +1,32 @@
 global _main
 
+;; Size of the virtual stack (in elements, not bytes)
 %define STACK_SIZE 100
 
+;; syscall code for exit
+%define SYSCALL_EXIT 0x2000001
+;; syscall code for read
+%define SYSCALL_READ 0x2000003
+
 section .bss
+	;; The virtual stack
 	stack: resq STACK_SIZE 
 
 section .data
+	;; The current position in the virtual stack
 	stack_pos: dq 0
 
+	;;
 	unread_char: dq -1
 
+	;; printf format string for printing long
 	number_format_string: db "%ld", 0xA, 0
 
-	stack_overflow_message: db "Stack overflow", 0xA
-	.len: equ $ - stack_overflow_message
+	;; Message for when stack overflow occurs
+	stack_overflow_message: db "Stack overflow", 0xA, 0
 
-	stack_underflow_message: db "Stack underflow", 0xA
-	.len: equ $ - stack_underflow_message
-	
-	padding_char_used: dq 0
+	;; Message for when stack underflow occurs
+	stack_underflow_message: db "Stack underflow", 0xA, 0
 	
 section .text
 default rel
@@ -107,10 +115,11 @@ op_mul:
 
 op_div: ;; TODO FIXME div
 	call popstack
-	mov rax, rcx
+	mov rbx, rcx
 	call popstack
+	mov rax, rcx
 	mov rdx, 0
-	div rcx
+	div rbx
 	mov rcx, rax
 	call pushstack
 
@@ -118,10 +127,11 @@ op_div: ;; TODO FIXME div
 
 op_mod: ;; TODO FIXME div
 	call popstack
-	mov rax, rcx
+	mov rbx, rcx
 	call popstack
+	mov rax, rcx
 	mov rdx, 0
-	div rcx
+	div rbx
 	mov rcx, rdx
 	call pushstack
 
@@ -183,12 +193,9 @@ pushstack: ; takes argument in rcx
 	ret
 
 stackoverflow:
-	mov rax, 0x2000004 ; write
-	mov rdi, 1 ; stdout
-	mov rsi, stack_overflow_message
-	add rsi, -20 ;; fixes offset
-	mov rdx, stack_overflow_message.len
-	syscall
+	mov rdi, stack_overflow_message
+	add rdi, -21 ;; fixes offset
+	call _printf
 
 	jmp error
 
@@ -209,14 +216,9 @@ popstack: ; returns result in rcx
 	ret
 
 stackunderflow:
-	mov rax, 0x2000004 ; write
-	mov rdi, 1 ; stdout
-	mov rsi, stack_underflow_message
-	add rsi, -36 ;; fixes offset
-	mov rdx, stack_underflow_message.len
-	add rdx, 1 ; increment by 1 to include '\n'
-	syscall
-
+	mov rdi, stack_underflow_message
+	add rdi, -37 ;; fixes offset
+	call _printf
 	jmp error
 
 unread: ; unreads a single character given in rcx (cannot be called multiple times without reading)
@@ -230,7 +232,7 @@ readchar: ; returns result in rcx
 	cmp qword [unread_char], -1
 	jne _readchar_unread_char
 	; perform normal read because no unread char
-	mov rax, 0x2000003 ; read
+	mov rax, SYSCALL_READ
 	mov rdi, 0
 	push rcx ; value is ignored, just location on stack is necessary
 	mov rsi, rsp
@@ -277,8 +279,12 @@ end_of_file:
 	push rcx ;; to offset stack
 	call _printf
 	
-	mov rax, 0x2000001 ; exit
-	mov rdi, 0
+	push qword 0
+	call exit
+
+exit:
+	pop rdi
+	mov rax, SYSCALL_EXIT
 	syscall
 
 error:	
