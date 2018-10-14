@@ -18,6 +18,8 @@ section .data
 	stack_underflow_message: db "Stack underflow", 0xA
 	.len: equ $ - stack_underflow_message
 	
+	padding_char_used: dq 0
+	
 section .text
 default rel
 
@@ -35,6 +37,7 @@ parserloop:
 	call unread
 	call read_number
 	mov rcx, rax
+testlabel:
 	call pushstack
 
 	jmp parserloop
@@ -147,14 +150,15 @@ read_number: ; parse a number literal from stdin and returns result in rax
 	mov rax, 0
 
 _read_number_loop:
-	call readchar 
+	call readchar 	
 	cmp cl, '0'
 	jb _read_number_end
 	cmp cl, '9'
 	ja _read_number_end
 
 	imul rax, 10
-	
+
+	and rcx, 0xFF	
 	add rcx, -0x30 ; subtract '0' to convert ASCII character value to integer value
 	add rax, rcx
 
@@ -264,7 +268,6 @@ putchar: ; takes argument in rcx
 	ret
 
 end_of_file:
-	;; TODO print number on stack
 	call popstack
 	mov rsi, rcx
 	mov rdi, number_format_string
