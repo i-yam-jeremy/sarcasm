@@ -16,8 +16,11 @@ section .data
 	;; The current position in the virtual stack
 	stack_pos: dq 0
 
-	;;
+	;; The unread character (-1 if no unread char)
 	unread_char: dq -1
+
+	;; Whether or not the EOF padding character been used
+	used_eof_padding_char: dq 0	
 
 	;; printf format string for printing long
 	number_format_string: db "%ld", 0xA, 0
@@ -37,22 +40,29 @@ default rel
 extern _printf
 
 _main:
-parserloop:
+	;; falls thru to interpreter_loop
+
+;; evaluates the characters from stdin
+interpreter_loop:
 	call readchar
 	
 	cmp cl, '0'
-	jb notnumber
+	jb interpret_notnumber
 	cmp cl, '9'
-	ja notnumber
+	ja interpret_notnumber
+	;; falls thru to interpret_number
 
+;; reads a number literal and pushes the value to the virtual stack
+interpret_number:
 	call unread
 	call read_number
 	mov rcx, rax
 	call pushstack
 
-	jmp parserloop
+	jmp interpreter_loop
 
-notnumber:
+;; interpret characters that are not number literals
+interpret_notnumber:
 	cmp cl, ' '
 	je whitespace
 	cmp cl, 0x09 ; '\t'
@@ -76,6 +86,8 @@ notnumber:
 	cmp cl, '@'
 	je op_dup
 
+	cmp rcx, -1
+	je end_of_file
 
 	jmp unknown_character	
 
@@ -83,7 +95,7 @@ notnumber:
 unknown_character:
 	mov rsi, rcx ;; the character that occurred
 	mov rdi, unknown_character_message
-	add rdi, -54 ;; fixes offset
+	add rdi, -62 ;; fixes offset
 	add rsp, -8 ;; align stack
 	call _printf
 	push qword 1
@@ -97,7 +109,7 @@ op_add:
 	add rcx, rax
 	call pushstack
 
-	jmp parserloop
+	jmp interpreter_loop
 
 ;; subtract the top two elements on the stack
 ;; 10 2 - is equivalent to 10 - 2
@@ -108,7 +120,7 @@ op_sub:
 	sub rcx, rax
 	call pushstack
 
-	jmp parserloop
+	jmp interpreter_loop
 
 ;; multiply the top two elements on the stack
 op_mul:
@@ -119,7 +131,7 @@ op_mul:
 	mov rcx, rax
 	call pushstack
 
-	jmp parserloop
+	jmp interpreter_loop
 
 ;; divide the top two elements on the stack
 ;; 10 2 / is equivalent to 10 / 2
@@ -133,7 +145,7 @@ op_div:
 	mov rcx, rax
 	call pushstack
 
-	jmp parserloop
+	jmp interpreter_loop
 
 ;; mod the top two elements on the stack
 ;; 10 2 % is equivalent to 10 % 2
@@ -147,7 +159,7 @@ op_mod:
 	mov rcx, rdx
 	call pushstack
 
-	jmp parserloop
+	jmp interpreter_loop
 
 ;; duplicate the top element on the stack
 op_dup:
@@ -155,11 +167,11 @@ op_dup:
 	call pushstack
 	call pushstack
 
-	jmp parserloop
+	jmp interpreter_loop
 
 ;; handle whitespace
 whitespace:
-	jmp parserloop ; ignore and keep looping
+	jmp interpreter_loop ; ignore and keep looping
 
 ;; reads a number literal from stdin and returns the result in rax
 read_number:
@@ -204,10 +216,10 @@ pushstack:
 ;; when the stack has exceeded the maximum size
 stackoverflow:
 	mov rdi, stack_overflow_message
-	add rdi, -21 ;; fixes offset
+	add rdi, -29 ;; fixes offset
 	call _printf
-
-	jmp error
+	push qword 1
+	call exit
 
 ;; pops a value from the virtual stack and returns the result in rcx
 popstack:
@@ -229,9 +241,10 @@ popstack:
 ;; when the stack is popped with zero elements in the stack
 stackunderflow:
 	mov rdi, stack_underflow_message
-	add rdi, -37 ;; fixes offset
+	add rdi, -45 ;; fixes offset
 	call _printf
-	jmp error
+	push qword 1
+	call exit
 
 ;; unreads a single character given in rcx (cannot be called multiple times without reading)
 unread:
@@ -245,10 +258,10 @@ readchar:
 
 	cmp qword [unread_char], -1
 	jne _readchar_unread_char
-	; perform normal read because no unread char
+	;; perform normal read because no unread char
 	mov rax, SYSCALL_READ
 	mov rdi, 0
-	push rcx ; value is ignored, just location on stack is necessary
+	add rsp, -8 ;; make location on stack to store result
 	mov rsi, rsp
 	mov rdx, 1
 	syscall
@@ -256,6 +269,7 @@ readchar:
 	je end_of_file
 
 	pop rcx
+	and rcx, 0xFF ;; ignore everything but the bottom-most byte
 
 	pop rdx
 	pop rax
@@ -270,29 +284,27 @@ _readchar_unread_char:
 	pop rax
 	ret
 
-putchar: ; takes argument in rcx
-	push rax
-	push rdx
-	mov rax, 0x2000004 ; write
-	mov rdi, 1 ; stdout
-	push rcx
-	mov rsi, rsp
-	mov rdx, 1
-	syscall
-	pop rcx
+;; Returns the EOF padding character (used to ensure the program doesn't quit early by checking the next character)
+use_padding_char:
+	mov qword [used_eof_padding_char], 1
+	mov rcx, -1 ;; padding char
+
+	add rsp, 8 ;; pop location used for storing read result
 	pop rdx
 	pop rax
 	ret
 
 ;; reached the end of stdin
 end_of_file:
+	mov rcx, [used_eof_padding_char]
+	cmp rcx, 0
+	je use_padding_char
+
 	call popstack
 	mov rsi, rcx
 	mov rdi, number_format_string
-	add rdi, -16
-	;;mov rbx, 0xFFFF
-	;;shl rbx, 48
-	push rcx ;; to offset stack
+	add rdi, -24
+	add rsp, -8 ;; to offset stack
 	call _printf
 	
 	push qword 0
@@ -302,9 +314,4 @@ end_of_file:
 exit:
 	pop rdi
 	mov rax, SYSCALL_EXIT
-	syscall
-
-error:	
-	mov rax, 0x2000001 ; exit
-	mov rdi, 17
 	syscall
