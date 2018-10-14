@@ -10,6 +10,8 @@ section .data
 
 	unread_char: dq -1
 
+	number_format_string: db "%ld", 0xA, 0
+
 	stack_overflow_message: db "Stack overflow", 0xA
 	.len: equ $ - stack_overflow_message
 
@@ -18,6 +20,9 @@ section .data
 	
 section .text
 default rel
+
+extern _printf
+
 _main:
 parserloop:
 	call readchar
@@ -43,6 +48,7 @@ notnumber:
 	je whitespace
 	cmp cl, 0x0D ; '\r'
 	je whitespace
+
 
 	cmp cl, '+'
 	je op_add
@@ -176,7 +182,7 @@ stackoverflow:
 	mov rax, 0x2000004 ; write
 	mov rdi, 1 ; stdout
 	mov rsi, stack_overflow_message
-	add rsi, -16 ;; fixes offset
+	add rsi, -20 ;; fixes offset
 	mov rdx, stack_overflow_message.len
 	syscall
 
@@ -202,7 +208,7 @@ stackunderflow:
 	mov rax, 0x2000004 ; write
 	mov rdi, 1 ; stdout
 	mov rsi, stack_underflow_message
-	add rsi, -32 ;; fixes offset
+	add rsi, -36 ;; fixes offset
 	mov rdx, stack_underflow_message.len
 	add rdx, 1 ; increment by 1 to include '\n'
 	syscall
@@ -227,7 +233,7 @@ readchar: ; returns result in rcx
 	mov rdx, 1
 	syscall
 	cmp rax, 0
-	je error
+	je end_of_file
 
 	pop rcx
 
@@ -257,7 +263,22 @@ putchar: ; takes argument in rcx
 	pop rax
 	ret
 
+end_of_file:
+	;; TODO print number on stack
+	call popstack
+	mov rsi, rcx
+	mov rdi, number_format_string
+	add rdi, -16
+	;;mov rbx, 0xFFFF
+	;;shl rbx, 48
+	push rcx ;; to offset stack
+	call _printf
+	
+	mov rax, 0x2000001 ; exit
+	mov rdi, 0
+	syscall
+
 error:	
 	mov rax, 0x2000001 ; exit
 	mov rdi, 17
-syscall
+	syscall
