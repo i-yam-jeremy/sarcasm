@@ -1,89 +1,35 @@
 # SarcASM
-SarcASM is an interpreter for a stack-based language. The interpreter is written in x86 assembly.
+SarcASM is an interpreter for post-fix basic mathematical operations. The interpreter is written in x64 assembly.
 
-## Basic Tutorial
-The following is a basic tutorial on how to use the SarcASM language.
+## Building
+```
+make TARGET_FORMAT=target_format
+```
+where `target_format` is replaced with a valid 64-bit NASM format
 
-### Integer Literals
-Simply typing an integer literal such as `10` will push that value to the stack. There are no negative integer literals in SarcASM so one must subtract an integer literal from zero.
-
-### Arithmetic
-Once enough values have been pushed to the stack, RPN (Reverse-Polish Notation) / Postfix can be used.
+### macOS
 ```
-10 2 +
-```
-```
-0 17 -
-```
-```
-8 4 *
-```
-```
-32 4 /
-```
-```
-8 3 %
+make TARGET_FORMAT=macho64
 ```
 
-### Duplicating Stack Values
-To duplicate a value on the stack simply use the operator `@`
+### Windows
 ```
-10 @
-```
-
-### Labels
-SarcASM is sort-of like assembly with slightly different syntax. There are no functions, there are only labels.  
-
-To define a label use `:labelname` (label names can only consist of lowercase alphabetical characters)
-```
-:main
-  10 2 +
+make TARGET_FORMAT=win64
 ```
 
-To push the address of a label to the stack use `#labelname`
+### Linux
 ```
-:label
-  9 3 +
+make TARGET_FORMAT=elf64
+```
+
+## Usage
+SarcASM reads input from STDIN. The easiest way to use SarcASM is to use redirect a file into STDIN.  
+For example `sarcasm < test.sarc`
+
+## Syntax
+SarcASM uses post-fix notation (also known as Reverse-Polish Notation). This means operators occur after the operands.  
+For example, `37 48 +`  
+The basic arithmetic operators and modulus are supported `+`, `-`, `*`, `/`, `%`. 
+Additionally, the `@` operator will duplicate the top element on the stack.  
   
-:main
-  10 #label
-```
-
-To call the label as a function (similar to the `call` instruction in assembly where the return address is pushed to the stack) use `#labelname .`
-```
-:label
-  9 3 +
-  
-:main
-  10 #label .
-```
-
-To return (similar to the `ret` instruction in assembly) use `~`. This will return to wherever the label was called from, but will keep the stack modifications done by the label. This allows for returning a value (or multiple values) on the stack. Arguments are from the stack before the label was called and can be used in operations and can be duplicated if multiple references are needed.
-```
-:label
-  9 3 + ~
-  
-:main
-  10 #label .
-```
-
-### Conditions Jumps
-To jump to a label based on the comparison of two stack values, use the operators `=`, `>`, and `<`. The address to jump to is the topmost value in the stack and the values to compare are the two values below it. If the comparison is true, it works the same as calling a label. If the comparison is false, it continues execution. In both cases, all three values (the address and two values to be compared) are popped off the stack before execution continues.
-```
-:label
-  9 3 + ~
-  
-:main
-  10 10 #label =
-```
-
-### Example Program
-```
-:fact
-  @ 1 #factbase =
-  @ 1 - #fact . * ~
-:factbase
-  1 ~
-:main
-  10 #fact .
-```
+And that's all there is to it. Enjoy playing around with it and feel free to extend it and implement more operators and functionality!
